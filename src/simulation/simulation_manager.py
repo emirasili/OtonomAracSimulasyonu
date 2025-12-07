@@ -77,6 +77,7 @@ class Game:
         self.selected_algorithm = None
         self.car = None
         self.pathfinder = PathFinder(GAME_MAP) # Yol bulma motorunu başlat
+        self.current_path = []
         
         # --- BUTONLARIN OLUŞTURULMASI ---
         # Ekranın ortasını hesapla
@@ -131,7 +132,9 @@ class Game:
         if algo_name == "BFS": path = self.pathfinder.bfs(start, goal)
         elif algo_name == "DFS": path = self.pathfinder.dfs(start, goal)
         elif algo_name == "A*": path = self.pathfinder.a_star(start, goal)
-
+        
+        self.current_path = path 
+        
         # Bulunan yolu arabaya yükle
         if path: self.car.set_path(path)
         else: print("Yol Bulunamadı!")
@@ -207,10 +210,29 @@ class Game:
         # Alt Bilgi (Footer)
         footer_surf = self.subtitle_font.render("Sakarya Üniversitesi - 2025", True, (100, 100, 100))
         self.screen.blit(footer_surf, footer_surf.get_rect(center=(self.width // 2, self.height - 30)))
+        
+    def draw_path(self):
+        if len(self.current_path) < 3:
+            return
+
+        trimmed_path = self.current_path[1:-1]
+
+        points = []
+        for (r, c) in trimmed_path:
+            x = c * TILE_SIZE + TILE_SIZE // 2
+            y = r * TILE_SIZE + TILE_SIZE // 2
+            points.append((x, y))
+
+        if len(points) >= 2:
+            pygame.draw.lines(self.screen, (255, 255, 255), False, points, 2)
+            pygame.draw.lines(self.screen, (255, 215, 0), False, points, 4)
 
     def draw_game(self, mouse_pos):
         """Oyun ekranını çizer (Harita, Araba, Bilgi Paneli)"""
         self.draw_map()
+        
+        # Bulunan yolu çiz
+        self.draw_path()
         
         # Arabayı çiz
         if self.car:
