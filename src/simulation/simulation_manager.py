@@ -1,4 +1,5 @@
 # Dosya: src/simulation/simulation_manager.py
+
 import pygame
 import sys
 import os
@@ -8,296 +9,448 @@ from ui.menu import Button
 from car.car_manager import Car
 from algorithms.pathfinding import PathFinder
 
+
+# ------------------------------------------------------
+# TRAFİK IŞIĞI SINIFI
+# ------------------------------------------------------
+class TrafficLight:
+    """Trafik ışığının durum ve zaman kontrolünü yapıyorum."""
+
+    def __init__(self, row, col, red_time=4, green_time=2.5):
+        self.row = row
+        self.col = col
+        self.red_time = red_time
+        self.green_time = green_time
+        self.state = "RED"     # ilk durumda kırmızı
+        self.timer = 0.0
+
+    def update(self, dt):
+        """Her karede zamanlayıcıyı yeniliyorum."""
+        self.timer += dt
+
+        if self.state == "RED" and self.timer >= self.red_time:
+            self.state = "GREEN"
+            self.timer = 0.0
+
+        elif self.state == "GREEN" and self.timer >= self.green_time:
+            self.state = "RED"
+            self.timer = 0.0
+
+
+# ------------------------------------------------------
+# ANA OYUN SINIFI
+# ------------------------------------------------------
 class Game:
+
     def __init__(self):
-        """
-        Oyunun başlatıldığı ve temel ayarların yapıldığı kurucu fonksiyon.
-        Ekranı, haritayı, görselleri ve menü elemanlarını hazırlar.
-        """
         pygame.init()
-        
-        # Harita boyutlarını hesapla (Satır x Sütun)
+
+        # Harita boyutları
         self.rows = len(GAME_MAP)
         self.cols = len(GAME_MAP[0])
-        
-        # Pencere boyutunu harita boyutuna göre ayarla (Piksel cinsinden)
+
+        # Ekran ayarları
         self.width = self.cols * TILE_SIZE
         self.height = self.rows * TILE_SIZE
         self.screen = pygame.display.set_mode((self.width, self.height))
-        
-        # --- PENCERE AYARLARI ---
-        pygame.display.set_caption("SAÜTONOM - Akıllı Araç Simülasyonu") 
-        self.clock = pygame.time.Clock() # FPS kontrolü için saat nesnesi
 
-        # --- GÖRSELLERİN YÜKLENMESİ (ASSETS) ---
-        # Harita elemanları için resim dosyalarını (PNG) yükleyip sözlüğe atıyoruz.
+        # Dinamik engeller
+        self.dynamic_obstacles = []
+        self.img_obstacle = pygame.image.load("assets/obstacle.png")
+        self.img_obstacle = pygame.transform.scale(
+            self.img_obstacle, (TILE_SIZE, TILE_SIZE)
+        )
+
+        pygame.display.set_caption("SAÜTONOM - Akıllı Araç Simülasyonu")
+        self.clock = pygame.time.Clock()
+
+        # Yol/duvar/resim yükleme
         self.images = {}
         assets = {
-            # Yol Parçaları (v: dikey, h: yatay, ur: yukarı-sağ köşe vb.)
             "v": "road_v.png", "h": "road_h.png",
             "ur": "road_ur.png", "rd": "road_rd.png",
             "dl": "road_dl.png", "lu": "road_lu.png",
             "t_up": "road_t_up.png", "t_down": "road_t_down.png",
             "t_left": "road_t_left.png", "t_right": "road_t_right.png",
             "cross": "road_cross.png",
-            # Diğer Elemanlar (1: Duvar, 2: Su, 3: Start, 4: Hedef)
             1: "wall.png", 2: "water.png",
             3: "start.png", 4: "target.png"
         }
-        
+
         for key, filename in assets.items():
             path = os.path.join("assets", filename)
             if os.path.exists(path):
                 img = pygame.image.load(path)
-                # Resimleri kare boyutuna (TILE_SIZE) ölçekle
-                self.images[key] = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+                self.images[key] = pygame.transform.scale(
+                    img, (TILE_SIZE, TILE_SIZE)
+                )
 
-        # --- MENÜ TASARIM ÖGELERİ ---
-        # Yazı Tipleri (Fontlar)
-        self.title_font = pygame.font.SysFont("Verdana", 50, bold=True) 
+        # Yazı tipleri
+        self.title_font = pygame.font.SysFont("Verdana", 50, bold=True)
         self.subtitle_font = pygame.font.SysFont("Verdana", 20)
         self.ui_font = pygame.font.SysFont("Arial", 18, bold=True)
 
-        # Menüdeki Büyük Araba Logosu
+        # Menü araba logosu
         car_path = os.path.join("assets", "car.png")
         self.menu_car_img = None
         if os.path.exists(car_path):
             img = pygame.image.load(car_path)
-            
-            # Pencere İkonunu Ayarla (Sol üstteki küçük ikon)
             icon_img = pygame.transform.scale(img, (32, 32))
             pygame.display.set_icon(icon_img)
-
-            # Menü logosunu büyüt ve hafif döndür
-            img = pygame.transform.scale(img, (140, 140)) 
+            img = pygame.transform.scale(img, (140, 140))
             self.menu_car_img = pygame.transform.rotate(img, 45)
 
-        # --- OYUN DURUM DEĞİŞKENLERİ ---
-        self.state = "MENU"  # Başlangıç durumu (MENU veya GAME olabilir)
+        # Oyun durumu
+        self.state = "MENU"
         self.selected_algorithm = None
         self.car = None
-        self.pathfinder = PathFinder(GAME_MAP) # Yol bulma motorunu başlat
+        self.pathfinder = PathFinder(GAME_MAP)
         self.current_path = []
-        
-        # --- BUTONLARIN OLUŞTURULMASI ---
-        # Ekranın ortasını hesapla
-        cx = self.width // 2 - 100
-        cy = self.height // 2 + 70 
-        
-        # Algoritma Seçim Butonları
-        self.btn_bfs = Button(cx, cy, 200, 50, "BFS", (0, 100, 200), (0, 150, 255))
-        self.btn_dfs = Button(cx, cy + 60, 200, 50, "DFS", (0, 150, 100), (0, 200, 150))
-        self.btn_astar = Button(cx, cy + 120, 200, 50, "A*", (200, 50, 50), (255, 80, 80))
 
-        # Oyun içi "GERİ DÖN" Butonu (Sağ Alt Köşe)
-        self.btn_back = Button(self.width - 120, self.height - 60, 100, 40, "GERİ", (200, 50, 50), (255, 80, 80))
-
-    def find_pos(self, value):
-        """
-        Harita matrisinde belirli bir değerin (örn: 3=Start) konumunu bulur.
-        Return: (satır, sütun) veya None
-        """
+        # Trafik ışıklarını tara
+        self.traffic_lights = []
         for r, row in enumerate(GAME_MAP):
-            for c, val in enumerate(row):
-                if val == value: return (r, c)
+            for c, v in enumerate(row):
+                if v == 6:
+                    self.traffic_lights.append(TrafficLight(r, c))
+
+        # Butonlar
+        cx = self.width // 2 - 100
+        cy = self.height // 2 + 70
+
+        self.btn_bfs = Button(cx, cy, 200, 50, "BFS",
+                              (0, 100, 200), (0, 150, 255))
+        self.btn_dfs = Button(cx, cy + 60, 200, 50, "DFS",
+                              (0, 150, 100), (0, 200, 150))
+        self.btn_astar = Button(cx, cy + 120, 200, 50,
+                                "A*", (200, 50, 50), (255, 80, 80))
+
+        self.btn_back = Button(
+            self.width - 120, self.height - 60,
+            100, 40, "GERİ", (200, 50, 50), (255, 80, 80)
+        )
+
+        # Dinamik engel zamanlama
+        self.obstacle_placed = False        # engel yerleştirildi mi?
+        self.obstacle_delay = 4.0           # kaç saniye sonra engel gelsin?
+        self.time_in_game = 0.0             # oyunda geçen süre
+
+    # ------------------------------------------------------
+    # (Şimdilik rastgele üretim kullanmıyoruz ama dursun)
+    # ------------------------------------------------------
+    def generate_dynamic_obstacles(self, count=1):
+        import random
+        self.dynamic_obstacles.clear()
+        attempts = 0
+
+        while len(self.dynamic_obstacles) < count and attempts < 200:
+            attempts += 1
+            r = random.randint(0, self.rows - 1)
+            c = random.randint(0, self.cols - 1)
+
+            if GAME_MAP[r][c] == 0:
+                self.dynamic_obstacles.append((r, c))
+
+    # ------------------------------------------------------
+    def find_pos(self, value):
+        for r, row in enumerate(GAME_MAP):
+            for c, v in enumerate(row):
+                if v == value:
+                    return (r, c)
         return None
 
+    # ------------------------------------------------------
+    # SİMÜLASYONU BAŞLAT
+    # ------------------------------------------------------
     def start_simulation(self, algo_name):
-        """
-        Bir algoritma butonuna basıldığında çalışır.
-        Arabayı oluşturur, algoritmayı çalıştırır ve rotayı hesaplar.
-        """
         self.selected_algorithm = algo_name
-        self.state = "GAME" # Oyun ekranına geç
-        print(f"{algo_name} Hesaplanıyor...")
+        self.state = "GAME"
 
-        # Başlangıç ve Hedef noktalarını bul
+        # Başlangıçta HİÇ DİNAMİK ENGEL YOK
+        self.dynamic_obstacles = []
+        self.obstacle_placed = False
+        self.time_in_game = 0.0
+
         start = self.find_pos(3)
         goal = self.find_pos(4)
-        if not start or not goal: return # Hata kontrolü
 
-        # Arabayı oluştur veya varsa konumunu sıfırla
-        if self.car is None: 
+        if not start or not goal:
+            print("Start veya hedef bulunamadı.")
+            return
+
+        if self.car is None:
             self.car = Car(start[0], start[1])
         else:
-             self.car.row, self.car.col = start[0], start[1]
-             self.car.image = self.car.original_image
-             # Akıcı hareket için piksel konumunu da sıfırla
-             if hasattr(self.car, 'pixel_x'):
-                 self.car.pixel_x = start[1] * TILE_SIZE
-                 self.car.pixel_y = start[0] * TILE_SIZE
+            self.car.row, self.car.col = start
+            self.car.pixel_x = start[1] * TILE_SIZE
+            self.car.pixel_y = start[0] * TILE_SIZE
 
-        # --- ALGORİTMA ÇALIŞTIRMA ---
-        path = []
-        if algo_name == "BFS": path = self.pathfinder.bfs(start, goal)
-        elif algo_name == "DFS": path = self.pathfinder.dfs(start, goal)
-        elif algo_name == "A*": path = self.pathfinder.a_star(start, goal)
-        
-        self.current_path = path 
-        
-        # Bulunan yolu arabaya yükle
-        if path: self.car.set_path(path)
-        else: print("Yol Bulunamadı!")
+        # Başlangıç rotasını, seçili algoritmaya göre ENGELSİZ hesapla
+        if algo_name == "BFS":
+            path = self.pathfinder.bfs(start, goal)
+        elif algo_name == "DFS":
+            path = self.pathfinder.dfs(start, goal)
+        else:  # A*
+            path = self.pathfinder.a_star(start, goal)
 
+        self.current_path = path
+
+        if path:
+            self.car.set_path(path)
+        else:
+            print("Yol bulunamadı!")
+
+    # ------------------------------------------------------
+    # Araç ilerledikten ve biraz süre geçtikten sonra önüne engel koy
+    # ------------------------------------------------------
+    def maybe_spawn_obstacle_after_delay(self):
+        """
+        Hedef:
+        - Hoca önce normal rotayı görsün.
+        - Araç biraz yürüsün (path_index >= 4 gibi) ve
+          ekranda 3–4 saniye geçsin.
+        - Sonra, ilerideki bir kareye engel koyulsun.
+        """
+        if self.obstacle_placed:
+            return
+        if not self.car or not self.car.path:
+            return
+
+        # Hâlâ erken: birkaç saniyelik gecikme
+        if self.time_in_game < self.obstacle_delay:
+            return
+
+        # Araç path üzerinde biraz yürümüş olsun
+        if self.car.path_index < 4:
+            return
+
+        # Araçtan İLERİDE bir kare seç (örnek: +6 adım sonrası)
+        idx = self.car.path_index + 6
+        if idx >= len(self.car.path):
+            idx = len(self.car.path) - 2  # hedefe çok yakınsa biraz geriye al
+
+        # Seçilen indeksten ileriye doğru ilk uygun yolu bul
+        chosen_cell = None
+        for i in range(idx, len(self.car.path) - 1):
+            r, c = self.car.path[i]
+            # Sadece normal yol hücresi (0) üzerine engel koy
+            if GAME_MAP[r][c] == 0:
+                chosen_cell = (r, c)
+                break
+
+        if not chosen_cell:
+            return
+
+        self.dynamic_obstacles = [chosen_cell]
+        self.obstacle_placed = True
+        print(f"🔴 Dinamik engel yerleştirildi: {chosen_cell}")
+
+    # ------------------------------------------------------
+    # ENGEL SONRASI ROTAYI TEKRAR HESAPLA
+    # ------------------------------------------------------
+    def recalculate_path_after_obstacle(self):
+        if not self.car:
+            return
+
+        current_pos = (self.car.row, self.car.col)
+        goal = self.find_pos(4)
+
+        if not goal:
+            print("Hedef bulunamadı!")
+            return
+
+        # Seçili algoritmaya göre, artık ENGEL varken yeniden rota hesapla
+        if self.selected_algorithm == "BFS":
+            new_path = self.pathfinder.bfs(
+                current_pos, goal, self.dynamic_obstacles
+            )
+        elif self.selected_algorithm == "DFS":
+            new_path = self.pathfinder.dfs(
+                current_pos, goal, self.dynamic_obstacles
+            )
+        else:
+            new_path = self.pathfinder.a_star(
+                current_pos, goal, self.dynamic_obstacles
+            )
+
+        if new_path:
+            print("✅ Yeni rota bulundu.")
+            self.current_path = new_path
+            self.car.set_path(new_path)
+        else:
+            print("❌ Yeni rota bulunamadı, araç olduğu yerde kalacak.")
+
+    # ------------------------------------------------------
+    # GAME LOOP
+    # ------------------------------------------------------
     def run(self):
-        """
-        Oyunun Ana Döngüsü (Game Loop).
-        Sürekli çalışarak ekranı günceller ve olayları dinler.
-        """
         while True:
-            mouse_pos = pygame.mouse.get_pos() # Fare konumunu al
-            events = pygame.event.get()        # Klavye/Fare olaylarını al
+            mouse_pos = pygame.mouse.get_pos()
+            events = pygame.event.get()
 
             for event in events:
-                # Çarpıya basılırsa kapat
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                
-                # Menüdeysek buton tıklamalarını kontrol et
+
                 if self.state == "MENU":
-                    if self.btn_bfs.is_clicked(event): self.start_simulation("BFS")
-                    elif self.btn_dfs.is_clicked(event): self.start_simulation("DFS")
-                    elif self.btn_astar.is_clicked(event): self.start_simulation("A*")
-                
-                # Oyundaysak "Geri Dön" butonunu kontrol et
+                    if self.btn_bfs.is_clicked(event):
+                        self.start_simulation("BFS")
+                    elif self.btn_dfs.is_clicked(event):
+                        self.start_simulation("DFS")
+                    elif self.btn_astar.is_clicked(event):
+                        self.start_simulation("A*")
+
                 elif self.state == "GAME":
                     if self.btn_back.is_clicked(event):
                         self.state = "MENU"
 
-            # Arka planı temizle (Siyah)
             self.screen.fill(BLACK)
 
-            # Duruma göre ekranı çiz
+            dt = self.clock.tick(FPS) / 1000.0
+
+            # Oyun süresini takip et (GAME modunda)
+            if self.state == "GAME":
+                self.time_in_game += dt
+
+            for tl in self.traffic_lights:
+                tl.update(dt)
+
             if self.state == "MENU":
                 self.draw_menu(mouse_pos)
-            elif self.state == "GAME":
+            else:
                 self.draw_game(mouse_pos)
 
-            # Ekranı yenile ve FPS'i sabitle
             pygame.display.flip()
-            self.clock.tick(FPS)
 
+    # ------------------------------------------------------
+    # MENÜ ÇİZİMİ
+    # ------------------------------------------------------
     def draw_menu(self, mouse_pos):
-        """Menü ekranını çizer (Arkaplan, Başlık, Butonlar)"""
-        self.screen.fill((25, 30, 40)) # Koyu Gri/Lacivert Arkaplan
-        
-        # Başlık ve Gölgesi
-        shadow = self.title_font.render("SAÜTONOM", True, (0, 0, 0))
-        shadow_rect = shadow.get_rect(center=(self.width // 2 + 3, 73))
-        self.screen.blit(shadow, shadow_rect)
+        self.screen.fill((25, 30, 40))
 
-        title_surf = self.title_font.render("SAÜTONOM", True, (255, 215, 0)) # Altın Sarısı
-        title_rect = title_surf.get_rect(center=(self.width // 2, 70))
-        self.screen.blit(title_surf, title_rect)
-        
-        # Alt Başlık
-        sub_surf = self.subtitle_font.render("Otonom Araç Simülasyonu", True, (200, 200, 200))
-        self.screen.blit(sub_surf, sub_surf.get_rect(center=(self.width // 2, 115)))
+        title = self.title_font.render("SAÜTONOM", True, (255, 215, 0))
+        self.screen.blit(title, title.get_rect(center=(self.width // 2, 70)))
 
-        # Logo
+        sub = self.subtitle_font.render(
+            "Otonom Araç Simülasyonu", True, (200, 200, 200)
+        )
+        self.screen.blit(sub, sub.get_rect(center=(self.width // 2, 115)))
+
         if self.menu_car_img:
-            self.screen.blit(self.menu_car_img, self.menu_car_img.get_rect(center=(self.width // 2, 230)))
+            self.screen.blit(
+                self.menu_car_img,
+                self.menu_car_img.get_rect(center=(self.width // 2, 230))
+            )
 
-        # Butonları Çiz (Fare üzerine gelince renk değişimi için check_hover)
         self.btn_bfs.check_hover(mouse_pos)
         self.btn_dfs.check_hover(mouse_pos)
         self.btn_astar.check_hover(mouse_pos)
+
         self.btn_bfs.draw(self.screen)
         self.btn_dfs.draw(self.screen)
         self.btn_astar.draw(self.screen)
 
-        # Alt Bilgi (Footer)
-        footer_surf = self.subtitle_font.render("Sakarya Üniversitesi - 2025", True, (100, 100, 100))
-        self.screen.blit(footer_surf, footer_surf.get_rect(center=(self.width // 2, self.height - 30)))
-        
-    def draw_path(self):
-        if len(self.current_path) < 3:
-            return
-
-        trimmed_path = self.current_path[1:-1]
-
-        points = []
-        for (r, c) in trimmed_path:
-            x = c * TILE_SIZE + TILE_SIZE // 2
-            y = r * TILE_SIZE + TILE_SIZE // 2
-            points.append((x, y))
-
-        if len(points) >= 2:
-            pygame.draw.lines(self.screen, (255, 255, 255), False, points, 2)
-            pygame.draw.lines(self.screen, (255, 215, 0), False, points, 4)
-
+    # ------------------------------------------------------
+    # OYUN ÇİZİMİ
+    # ------------------------------------------------------
     def draw_game(self, mouse_pos):
-        """Oyun ekranını çizer (Harita, Araba, Bilgi Paneli)"""
         self.draw_map()
-        
-        # Bulunan yolu çiz
-        self.draw_path()
-        
-        # Arabayı çiz
-        if self.car:
-            self.car.update() # Arabanın yeni konumunu hesapla
-            self.car.draw(self.screen)
-        
-        # --- BİLGİ PANELİ (Sol Üst) ---
-        info_surf = pygame.Surface((220, 45))
-        info_surf.set_alpha(220) # Yarı saydamlık
-        info_surf.fill((20, 20, 20))
-        self.screen.blit(info_surf, (10, 10))
-        pygame.draw.rect(self.screen, WHITE, (10, 10, 220, 45), 2) # Çerçeve
-        
-        # Hangi algoritmanın çalıştığını yaz
-        text = self.ui_font.render(f"Algoritma: {self.selected_algorithm}", True, ORANGE)
-        self.screen.blit(text, (25, 22))
+        self.draw_traffic_lights()
 
-        # "Geri Dön" Butonunu Çiz
+        # Araba güncelleme
+        if self.car:
+            # Önce zamanı ve alınan yolu kontrol edip GECİKMELİ engel koy
+            self.maybe_spawn_obstacle_after_delay()
+
+            # Sonra arabayı güncelle (engel varsa Car.update True döndürecek)
+            must_replan = self.car.update(
+                GAME_MAP, self.traffic_lights, self.dynamic_obstacles
+            )
+
+            if must_replan:
+                self.recalculate_path_after_obstacle()
+
+            self.car.draw(self.screen)
+
+        # Dinamik engelleri çiz
+        for (r, c) in self.dynamic_obstacles:
+            x = c * TILE_SIZE
+            y = r * TILE_SIZE
+            self.screen.blit(self.img_obstacle, (x, y))
+
+        self.draw_path()
+
         self.btn_back.check_hover(mouse_pos)
         self.btn_back.draw(self.screen)
 
+    # ------------------------------------------------------
     def is_road(self, r, c):
-        """Verilen koordinatın yol olup olmadığını kontrol eder."""
         if 0 <= r < self.rows and 0 <= c < self.cols:
-            # 0: Yol, 3: Start, 4: Hedef, 5: Kavşak -> Hepsi yol sayılır
-            return GAME_MAP[r][c] in [0, 3, 4, 5]
+            return GAME_MAP[r][c] in [0, 3, 4, 5, 6]
         return False
 
+    # ------------------------------------------------------
     def draw_map(self):
-        """
-        Haritayı ekrana çizer.
-        Bitmasking yöntemi kullanarak yolların doğru şekilde birleşmesini sağlar.
-        """
         for r in range(self.rows):
             for c in range(self.cols):
                 cell = GAME_MAP[r][c]
                 img = None
-                
-                # --- AKILLI YOL ÇİZİMİ (Auto-Tiling) ---
-                if cell == 0 or cell == 5:
+
+                if cell in (0, 5):
                     mask = 0
-                    # Komşuları kontrol et: Yukarı(1), Sağ(2), Aşağı(4), Sol(8)
-                    if self.is_road(r-1, c): mask += 1 
-                    if self.is_road(r, c+1): mask += 2 
-                    if self.is_road(r+1, c): mask += 4 
-                    if self.is_road(r, c-1): mask += 8 
-                    
-                    # Maske değerine göre doğru resmi seç
-                    # Örn: mask=3 (Yukarı+Sağ) -> Sağ-Üst Köşe (ur)
-                    if mask in [5, 1, 4]: img = self.images.get("v")   # Dikey
-                    elif mask in [10, 2, 8]: img = self.images.get("h") # Yatay
-                    elif mask == 3: img = self.images.get("ur")  # Sağ-Üst
-                    elif mask == 6: img = self.images.get("rd")  # Sağ-Alt
-                    elif mask == 12: img = self.images.get("dl") # Sol-Alt
-                    elif mask == 9: img = self.images.get("lu")  # Sol-Üst
-                    elif mask == 14: img = self.images.get("t_down") # T Aşağı
-                    elif mask == 11: img = self.images.get("t_up")   # T Yukarı
-                    elif mask == 7: img = self.images.get("t_right") # T Sağ
-                    elif mask == 13: img = self.images.get("t_left") # T Sol
-                    elif mask == 15: img = self.images.get("cross")  # Dört Yol
-                    else: img = self.images.get("h") # Varsayılan
+                    if self.is_road(r - 1, c):
+                        mask += 1
+                    if self.is_road(r, c + 1):
+                        mask += 2
+                    if self.is_road(r + 1, c):
+                        mask += 4
+                    if self.is_road(r, c - 1):
+                        mask += 8
+
+                    mapping = {
+                        5: "v", 1: "v", 4: "v",
+                        10: "h", 2: "h", 8: "h",
+                        3: "ur", 6: "rd", 12: "dl",
+                        9: "lu", 14: "t_down", 11: "t_up",
+                        7: "t_right", 13: "t_left", 15: "cross"
+                    }
+
+                    img = self.images.get(mapping.get(mask, "h"))
+
                 else:
-                    # Yol değilse normal resmini al (Duvar, Su vb.)
                     img = self.images.get(cell)
 
-                # Resmi ekrana bas
                 if img:
-                    self.screen.blit(img, (c*TILE_SIZE, r*TILE_SIZE))
+                    self.screen.blit(img, (c * TILE_SIZE, r * TILE_SIZE))
+
+    # ------------------------------------------------------
+    def draw_traffic_lights(self):
+        for tl in self.traffic_lights:
+            x = tl.col * TILE_SIZE
+            y = tl.row * TILE_SIZE
+
+            rect = pygame.Rect(
+                x + TILE_SIZE // 4,
+                y + TILE_SIZE // 4,
+                TILE_SIZE // 2,
+                TILE_SIZE // 2
+            )
+
+            color = (220, 0, 0) if tl.state == "RED" else (0, 180, 0)
+            pygame.draw.rect(self.screen, color, rect)
+
+    # ------------------------------------------------------
+    def draw_path(self):
+        if len(self.current_path) < 2:
+            return
+
+        pts = []
+        for (r, c) in self.current_path:
+            x = c * TILE_SIZE + TILE_SIZE // 2
+            y = r * TILE_SIZE + TILE_SIZE // 2
+            pts.append((x, y))
+
+        if len(pts) >= 2:
+            pygame.draw.lines(self.screen, (255, 255, 255), False, pts, 2)
+            pygame.draw.lines(self.screen, (255, 215, 0), False, pts, 4)

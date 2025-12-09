@@ -107,3 +107,9 @@ s = pygame.Surface((TILE_SIZE, TILE_SIZE)); s.fill((255, 215, 0)); font = pygame
 s = pygame.Surface((TILE_SIZE, TILE_SIZE)); s.fill((255, 0, 0)); pygame.draw.rect(s, (255, 255, 255), (0, 0, 20, 20)); pygame.draw.rect(s, (255, 255, 255), (20, 20, 20, 20)); save_surface(s, "target.png")
 
 pygame.quit()
+
+# Dinamik Engel (Kırmızı Kare)
+s = pygame.Surface((TILE_SIZE, TILE_SIZE))
+s.fill((200, 0, 0))
+pygame.draw.rect(s, (100, 0, 0), (0, 0, TILE_SIZE, TILE_SIZE), 3)
+save_surface(s, "obstacle.png")

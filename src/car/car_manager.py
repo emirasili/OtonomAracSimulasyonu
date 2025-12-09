@@ -3,12 +3,14 @@ import pygame
 import os
 from simulation.settings import *
 
+
 class Car:
     def __init__(self, start_row, start_col):
+        # Arabanın grid üzerindeki satır/sütun konumu
         self.row = start_row
         self.col = start_col
-        
-        # GÖRSEL YÜKLEME
+
+        # Araç görselini yükle
         asset_path = os.path.join("assets", "car.png")
         try:
             self.original_image = pygame.image.load(asset_path)
@@ -16,74 +18,128 @@ class Car:
             self.original_image = pygame.Surface((TILE_SIZE, TILE_SIZE))
             self.original_image.fill((255, 0, 0))
 
-        self.original_image = pygame.transform.scale(self.original_image, (TILE_SIZE, TILE_SIZE))
+        # Boyutlandır
+        self.original_image = pygame.transform.scale(
+            self.original_image, (TILE_SIZE, TILE_SIZE)
+        )
         self.image = self.original_image
         self.angle = 0
-        
-        # --- AKICI HAREKET DEĞİŞKENLERİ ---
-        # Artık aracın "Piksel" cinsinden hassas bir konumu var
+
+        # Piksel konumu
         self.pixel_x = start_col * TILE_SIZE
         self.pixel_y = start_row * TILE_SIZE
-        
-        self.path = []      
-        self.path_index = 0 
-        self.speed = 4  # Hız Ayarı (Piksel/Frame). Artırırsan hızlanır.
 
+        # Yol takip değişkenleri
+        self.path = []
+        self.path_index = 0
+        self.speed = 4  # Piksel/frame
+
+    # ---------------------------------------------------------
+    # 🔍 DİNAMİK ENGEL ALGILAMA
+    # ---------------------------------------------------------
+    def detect_dynamic_obstacle(self, dynamic_obstacles):
+        """
+        Bir sonraki karede dinamik engel var mı kontrol eder.
+        True → Engel var, rota değiştirilmelidir.
+        """
+        if self.path_index >= len(self.path):
+            return False
+
+        next_r, next_c = self.path[self.path_index]
+        return (next_r, next_c) in dynamic_obstacles
+
+    # ---------------------------------------------------------
     def set_path(self, path):
-        """Algoritmadan gelen rotayı yükler"""
+        """Algoritmadan gelen yeni rotayı yükler."""
         self.path = path
         self.path_index = 0
-        # Yeni rota başladığında piksel konumunu grid konumuna eşitle (Reset)
+
         if path:
             self.row, self.col = path[0]
             self.pixel_x = self.col * TILE_SIZE
             self.pixel_y = self.row * TILE_SIZE
 
-    def update(self):
-        """Her karede çalışır, hedefe doğru kayarak ilerler"""
-        
-        # Eğer gidilecek bir yol varsa ve henüz bitmediyse
-        if self.path and self.path_index < len(self.path):
-            # Hedef karenin koordinatlarını al
-            target_node = self.path[self.path_index]
-            target_row, target_col = target_node
-            
-            # Hedefin piksel karşılığı
-            target_x = target_col * TILE_SIZE
-            target_y = target_row * TILE_SIZE
-            
-            # Hedefe olan uzaklığı ve yönü hesapla
-            dx = target_x - self.pixel_x
-            dy = target_y - self.pixel_y
-            distance = (dx**2 + dy**2)**0.5
-            
-            # Eğer hedefe çok yaklaştıysak (Hızımızdan daha yakınsak)
-            if distance < self.speed:
-                # Hedefe "yapış" ve sıradaki adıma geç
-                self.pixel_x = target_x
-                self.pixel_y = target_y
-                self.row = target_row
-                self.col = target_col
-                self.path_index += 1
-            else:
-                # Hedefe doğru "speed" kadar ilerle (Vektör matematiği)
-                move_x = (dx / distance) * self.speed
-                move_y = (dy / distance) * self.speed
-                
-                self.pixel_x += move_x
-                self.pixel_y += move_y
-                
-                # --- DÖNÜŞ (ROTATION) ---
-                # Hangi yöne gidiyorsak ona göre dönelim
-                # dx pozitifse SAĞA gidiyoruz, negatifse SOLA
-                if abs(dx) > abs(dy): # Yatay hareket baskınsa
-                    self.angle = -90 if dx > 0 else 90
-                else: # Dikey hareket baskınsa
-                    self.angle = 180 if dy > 0 else 0
+    # ---------------------------------------------------------
+    def update(self, game_map=None, traffic_lights=None, dynamic_obstacles=None):
+        """
+        Her karede çağrılan ana hareket fonksiyonu.
+        - Önce bulunduğum karede kırmızı ışık var mı kontrol ediyorum.
+        - İkinci adımda, sıradaki karede dinamik engel var mı diye bakıyorum.
+        - Engel yoksa path üzerindeki hedef kareye doğru akıcı şekilde ilerliyorum.
 
-                self.image = pygame.transform.rotate(self.original_image, self.angle)
+        True dönerse: Dinamik engel tespit edildi, dışarıda yeniden rota planlanmalı.
+        False dönerse: Normal ilerledi veya ışıkta bekledi, yeniden planlamaya gerek yok.
+        """
+        if traffic_lights is None:
+            traffic_lights = []
 
+        if dynamic_obstacles is None:
+            dynamic_obstacles = []
+
+        # Arabanın şu an bulunduğu grid karesini hesaplıyorum.
+        current_row = int(self.pixel_y // TILE_SIZE)
+        current_col = int(self.pixel_x // TILE_SIZE)
+
+        # Bulunduğum karede kırmızı ışık varsa, bu frame'de hiç hareket etmiyorum.
+        for tl in traffic_lights:
+            if tl.row == current_row and tl.col == current_col and tl.state == "RED":
+                return False  # Hareket yok, yeniden planlama da yok
+
+        # Takip edilecek bir yol yoksa ya da sona geldiysem hareket etmiyorum.
+        if not self.path or self.path_index >= len(self.path):
+            return False
+
+        # --- Dinamik engel kontrolü ---
+        # Sıradaki karede engel varsa bu frame'de ilerlemiyorum
+        # ve dışarıya "yeniden rota planla" sinyali olarak True döndürüyorum.
+        if self.detect_dynamic_obstacle(dynamic_obstacles):
+            return True
+
+        # Sıradaki hedef kare
+        target_row, target_col = self.path[self.path_index]
+
+        # Hedef karenin piksel koordinatları
+        target_x = target_col * TILE_SIZE
+        target_y = target_row * TILE_SIZE
+
+        # Hedefe olan mesafe ve yönü hesaplıyorum.
+        dx = target_x - self.pixel_x
+        dy = target_y - self.pixel_y
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+
+        if distance < self.speed:
+            # Hedef kareye yeterince yaklaştıysam direkt olarak oraya "yapışıyorum".
+            self.pixel_x = target_x
+            self.pixel_y = target_y
+            self.row = target_row
+            self.col = target_col
+            self.path_index += 1
+        else:
+            # Hedefe doğru normalleştirilmiş bir vektörle ilerliyorum.
+            move_x = (dx / distance) * self.speed
+            move_y = (dy / distance) * self.speed
+
+            self.pixel_x += move_x
+            self.pixel_y += move_y
+
+            # Hareket yönüne göre arabayı döndürüyorum.
+            if abs(dx) > abs(dy):  # Yatay hareket baskın
+                self.angle = -90 if dx > 0 else 90
+            else:  # Dikey hareket baskın
+                self.angle = 180 if dy > 0 else 0
+
+            self.image = pygame.transform.rotate(
+                self.original_image, self.angle)
+
+        return False  # Engel yoktu, normal ilerledim; yeniden planlama gerekmiyor
+
+    # ---------------------------------------------------------
     def draw(self, screen):
-        # Artık self.col * TILE_SIZE yerine hassas pixel_x kullanıyoruz
-        rect = self.image.get_rect(center=(self.pixel_x + TILE_SIZE//2, self.pixel_y + TILE_SIZE//2))
-        screen.blit(self.image, rect)
+        """Aracı ekran üzerine çizer."""
+        rect = self.image.get_rect(
+            center=(
+                self.pixel_x + TILE_SIZE // 2,
+                self.pixel_y + TILE_SIZE // 2,
+            )
+        )
+        screen.blit(self.image, rect)  # bu fonksiyon ekrana çizmeyi yapar
