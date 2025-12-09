@@ -62,7 +62,7 @@ class PathFinder:
     # --------------------------------------------------------
     # BFS
     # --------------------------------------------------------
-    def bfs(self, start, goal):
+    def bfs(self, start, goal, dynamic_obstacles=None):
         queue = [start]
         came_from = {start: None}
 
@@ -72,7 +72,8 @@ class PathFinder:
             if current == goal:
                 return self.reconstruct_path(came_from, goal)
 
-            for next_node in self.get_neighbors(current):
+            # Dinamik engelleri de hesaba kat
+            for next_node in self.get_neighbors(current, dynamic_obstacles):
                 if next_node not in came_from:
                     came_from[next_node] = current
                     queue.append(next_node)
@@ -82,7 +83,7 @@ class PathFinder:
     # --------------------------------------------------------
     # DFS
     # --------------------------------------------------------
-    def dfs(self, start, goal):
+    def dfs(self, start, goal, dynamic_obstacles=None):
         stack = [start]
         came_from = {start: None}
 
@@ -92,7 +93,8 @@ class PathFinder:
             if current == goal:
                 return self.reconstruct_path(came_from, goal)
 
-            for next_node in self.get_neighbors(current):
+            # Dinamik engelleri de hesaba kat
+            for next_node in self.get_neighbors(current, dynamic_obstacles):
                 if next_node not in came_from:
                     came_from[next_node] = current
                     stack.append(next_node)
