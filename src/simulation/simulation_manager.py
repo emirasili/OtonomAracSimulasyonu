@@ -56,10 +56,17 @@ class Game:
 
         # Dinamik engeller
         self.dynamic_obstacles = []
-        self.img_obstacle = pygame.image.load("assets/obstacle.png")
-        self.img_obstacle = pygame.transform.scale(
-            self.img_obstacle, (TILE_SIZE, TILE_SIZE)
-        )
+        
+        # Engel görseli yükleme (obstacle.png)
+        obstacle_path = "assets/obstacle.png"
+        self.img_obstacle = None
+        if os.path.exists(obstacle_path):
+             self.img_obstacle = pygame.image.load(obstacle_path)
+             self.img_obstacle = pygame.transform.scale(self.img_obstacle, (TILE_SIZE, TILE_SIZE))
+        else:
+             self.img_obstacle = pygame.Surface((TILE_SIZE, TILE_SIZE))
+             self.img_obstacle.fill((200, 50, 50))
+
 
         pygame.display.set_caption("SAÜTONOM - Akıllı Araç Simülasyonu")
         self.clock = pygame.time.Clock()
@@ -74,7 +81,9 @@ class Game:
             "t_left": "road_t_left.png", "t_right": "road_t_right.png",
             "cross": "road_cross.png",
             1: "wall.png", 2: "water.png",
-            3: "start.png", 4: "target.png"
+            3: "start.png", 4: "target.png",
+            7: "crosswalk.png", # Yaya geçidi ana zemini
+            "traffic_light_img": "traffic_light.png" # Işık direği
         }
 
         for key, filename in assets.items():
@@ -85,6 +94,12 @@ class Game:
                     img, (TILE_SIZE, TILE_SIZE)
                 )
 
+        # Yaya geçidi zemini (Eğer crosswalk.png yoksa)
+        if 7 not in self.images:
+            s = pygame.Surface((TILE_SIZE, TILE_SIZE))
+            s.fill((50, 50, 50)) 
+            self.images[7] = s
+        
         # Yazı tipleri
         self.title_font = pygame.font.SysFont("Verdana", 50, bold=True)
         self.subtitle_font = pygame.font.SysFont("Verdana", 20)
@@ -131,25 +146,9 @@ class Game:
         )
 
         # Dinamik engel zamanlama
-        self.obstacle_placed = False        # engel yerleştirildi mi?
-        self.obstacle_delay = 6.0           # kaç saniye sonra engel gelsin?
-        self.time_in_game = 0.0             # oyunda geçen süre
-
-    # ------------------------------------------------------
-    # (Şimdilik rastgele üretim kullanmıyoruz ama dursun)
-    # ------------------------------------------------------
-    def generate_dynamic_obstacles(self, count=1):
-        import random
-        self.dynamic_obstacles.clear()
-        attempts = 0
-
-        while len(self.dynamic_obstacles) < count and attempts < 200:
-            attempts += 1
-            r = random.randint(0, self.rows - 1)
-            c = random.randint(0, self.cols - 1)
-
-            if GAME_MAP[r][c] == 0:
-                self.dynamic_obstacles.append((r, c))
+        self.obstacle_placed = False        
+        self.obstacle_delay = 6.0           
+        self.time_in_game = 0.0             
 
     # ------------------------------------------------------
     def find_pos(self, value):
@@ -204,36 +203,25 @@ class Game:
     # Araç ilerledikten ve biraz süre geçtikten sonra önüne engel koy
     # ------------------------------------------------------
     def maybe_spawn_obstacle_after_delay(self):
-        """
-        Hedef:
-        - Hoca önce normal rotayı görsün.
-        - Araç biraz yürüsün (path_index >= 4 gibi) ve
-          ekranda 3–4 saniye geçsin.
-        - Sonra, ilerideki bir kareye engel koyulsun.
-        """
+        """Dinamik engeli gecikmeyle yerleştirir."""
         if self.obstacle_placed:
             return
         if not self.car or not self.car.path:
             return
 
-        # Hâlâ erken: birkaç saniyelik gecikme
         if self.time_in_game < self.obstacle_delay:
             return
 
-        # Araç path üzerinde biraz yürümüş olsun
         if self.car.path_index < 4:
             return
 
-        # Araçtan İLERİDE bir kare seç (örnek: +6 adım sonrası)
         idx = self.car.path_index + 6
         if idx >= len(self.car.path):
-            idx = len(self.car.path) - 2  # hedefe çok yakınsa biraz geriye al
+            idx = len(self.car.path) - 2  
 
-        # Seçilen indeksten ileriye doğru ilk uygun yolu bul
         chosen_cell = None
         for i in range(idx, len(self.car.path) - 1):
             r, c = self.car.path[i]
-            # Sadece normal yol hücresi (0) üzerine engel koy
             if GAME_MAP[r][c] == 0:
                 chosen_cell = (r, c)
                 break
@@ -309,7 +297,6 @@ class Game:
 
             dt = self.clock.tick(FPS) / 1000.0
 
-            # Oyun süresini takip et (GAME modunda)
             if self.state == "GAME":
                 self.time_in_game += dt
 
@@ -360,10 +347,8 @@ class Game:
 
         # Araba güncelleme
         if self.car:
-            # Önce zamanı ve alınan yolu kontrol edip GECİKMELİ engel koy
             self.maybe_spawn_obstacle_after_delay()
 
-            # Sonra arabayı güncelle (engel varsa Car.update True döndürecek)
             must_replan = self.car.update(
                 GAME_MAP, self.traffic_lights, self.dynamic_obstacles
             )
@@ -381,13 +366,25 @@ class Game:
 
         self.draw_path()
 
+        # UI Overlay
+        info_surf = pygame.Surface((220, 45))
+        info_surf.set_alpha(220) 
+        info_surf.fill((20, 20, 20))
+        self.screen.blit(info_surf, (10, 10))
+        pygame.draw.rect(self.screen, WHITE, (10, 10, 220, 45), 2)
+        
+        text = self.ui_font.render(f"Algoritma: {self.selected_algorithm}", True, ORANGE)
+        self.screen.blit(text, (25, 22))
+
+
         self.btn_back.check_hover(mouse_pos)
         self.btn_back.draw(self.screen)
 
     # ------------------------------------------------------
     def is_road(self, r, c):
+        # Yaya geçidi (7) de yol sayılır
         if 0 <= r < self.rows and 0 <= c < self.cols:
-            return GAME_MAP[r][c] in [0, 3, 4, 5, 6]
+            return GAME_MAP[r][c] in [0, 3, 4, 5, 6, 7]
         return False
 
     # ------------------------------------------------------
@@ -397,16 +394,13 @@ class Game:
                 cell = GAME_MAP[r][c]
                 img = None
 
-                if cell in (0, 5, 6):
+                # YOL, KAVŞAK, IŞIK veya YAYA GEÇİDİ için yol çiz
+                if cell in (0, 5, 6, 7):
                     mask = 0
-                    if self.is_road(r - 1, c):
-                        mask += 1
-                    if self.is_road(r, c + 1):
-                        mask += 2
-                    if self.is_road(r + 1, c):
-                        mask += 4
-                    if self.is_road(r, c - 1):
-                        mask += 8
+                    if self.is_road(r - 1, c): mask += 1
+                    if self.is_road(r, c + 1): mask += 2
+                    if self.is_road(r + 1, c): mask += 4
+                    if self.is_road(r, c - 1): mask += 8
 
                     mapping = {
                         5: "v", 1: "v", 4: "v",
@@ -416,29 +410,72 @@ class Game:
                         7: "t_right", 13: "t_left", 15: "cross"
                     }
 
-                    img = self.images.get(mapping.get(mask, "h"))
-
+                    # Yaya Geçidi (7) için zemin yolunu seç, diğerleri için normal maske
+                    img_key = mapping.get(mask, "h")
+                    if cell == 7:
+                        img = self.images.get(7) # Yaya geçidi zemini
+                    else:
+                        img = self.images.get(img_key)
                 else:
                     img = self.images.get(cell)
 
                 if img:
                     self.screen.blit(img, (c * TILE_SIZE, r * TILE_SIZE))
+        
+        # Yaya geçitlerinin çizgilerini en üstte çiz (Yolun üzerine)
+        self.draw_crosswalk_lines()
 
-    # ------------------------------------------------------
+
+    def draw_crosswalk_lines(self):
+        """Yaya geçitlerinin beyaz çizgilerini haritanın üzerine çizer."""
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if GAME_MAP[r][c] == 7:
+                    x = c * TILE_SIZE
+                    y = r * TILE_SIZE
+                    
+                    # Yolun yatay mı dikey mi olduğunu kontrol et
+                    is_horizontal = self.is_road(r, c-1) or self.is_road(r, c+1)
+                    
+                    if is_horizontal:
+                        # Yatay yol üzerinde DİKEY çizgiler çiz (Klasik yaya geçidi)
+                        for i in range(5, TILE_SIZE, 8):
+                            pygame.draw.rect(self.screen, WHITE, (x, y + i, TILE_SIZE, 4))
+                    else:
+                        # Dikey yol üzerinde YATAY çizgiler çiz
+                        for i in range(5, TILE_SIZE, 8):
+                            pygame.draw.rect(self.screen, WHITE, (x + i, y, 4, TILE_SIZE))
+
+   # ------------------------------------------------------
     def draw_traffic_lights(self):
         for tl in self.traffic_lights:
             x = tl.col * TILE_SIZE
             y = tl.row * TILE_SIZE
+            
+            # 1. Önce "Sönük" Trafik Işığı Resmini Çiz (Direk ve Kutu)
+            if "traffic_light_img" in self.images:
+                 img = self.images.get("traffic_light_img")
+                 # Resmi olduğu gibi karenin üzerine oturt
+                 self.screen.blit(img, (x, y))
+            
+            # 2. Şimdi YANAN ışığı (parlak daireyi) resmin üzerine çiz
+            # create_assets.py'de hesaplanan: Merkez X=20, Kırmızı Y=10, Yeşil Y=30
+            # x, y karenin sol üst köşesidir. Merkezler buna göre kaydırılır.
+            
+            light_x = x + 20 
+            
+            if tl.state == "RED":
+                # Kırmızı Işık (Üst - y+10)
+                # Parlama efekti için önce biraz büyük şeffaf, sonra küçük parlak
+                pygame.draw.circle(self.screen, (255, 0, 0), (light_x, y + 10), 5)
+                # Orta noktaya beyazımsı parlaklık
+                pygame.draw.circle(self.screen, (255, 100, 100), (light_x, y + 10), 2)
+            else:
+                # Yeşil Işık (Alt - y+30)
+                pygame.draw.circle(self.screen, (0, 255, 0), (light_x, y + 30), 5)
+                # Orta noktaya beyazımsı parlaklık
+                pygame.draw.circle(self.screen, (100, 255, 100), (light_x, y + 30), 2)
 
-            rect = pygame.Rect(
-                x + TILE_SIZE // 4,
-                y + TILE_SIZE // 4,
-                TILE_SIZE // 2,
-                TILE_SIZE // 2
-            )
-
-            color = (220, 0, 0) if tl.state == "RED" else (0, 180, 0)
-            pygame.draw.rect(self.screen, color, rect)
 
     # ------------------------------------------------------
     def draw_path(self):
@@ -452,5 +489,7 @@ class Game:
             pts.append((x, y))
 
         if len(pts) >= 2:
+            # Beyaz dış çizgi (gölge)
             pygame.draw.lines(self.screen, (255, 255, 255), False, pts, 2)
+            # Sarı/Turuncu iç çizgi (rota)
             pygame.draw.lines(self.screen, (255, 215, 0), False, pts, 4)
