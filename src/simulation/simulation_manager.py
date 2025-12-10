@@ -132,7 +132,7 @@ class Game:
 
         # Dinamik engel zamanlama
         self.obstacle_placed = False        # engel yerleştirildi mi?
-        self.obstacle_delay = 4.0           # kaç saniye sonra engel gelsin?
+        self.obstacle_delay = 6.0           # kaç saniye sonra engel gelsin?
         self.time_in_game = 0.0             # oyunda geçen süre
 
     # ------------------------------------------------------
@@ -397,7 +397,7 @@ class Game:
                 cell = GAME_MAP[r][c]
                 img = None
 
-                if cell in (0, 5):
+                if cell in (0, 5, 6):
                     mask = 0
                     if self.is_road(r - 1, c):
                         mask += 1

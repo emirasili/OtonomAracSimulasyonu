@@ -16,5 +16,5 @@ GRID_COLOR = (40, 40, 40)
 # --- EKRAN AYARLARI ---
 # Haritamız 20x20 olduğu için TILE_SIZE 40 olursa ekran 800x800 olur.
 # Bu boyut hem nettir hem de çoğu ekrana sığar.
-TILE_SIZE = 40
+TILE_SIZE = 28
 FPS = 60
