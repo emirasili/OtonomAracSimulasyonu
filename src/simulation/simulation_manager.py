@@ -8,6 +8,43 @@ from map.map_data import GAME_MAP
 from ui.menu import Button
 from car.car_manager import Car
 from algorithms.pathfinding import PathFinder
+import time
+
+class SimulationMetrics:
+    def __init__(self, algorithm_name):
+        self.algorithm_name = algorithm_name
+        self.start_time = time.time()
+        self.end_time = None
+        self.frame_count = 0
+        self.total_distance = 0
+        self.last_cell = None
+        self.finished = False
+
+    def update(self, car):
+        self.frame_count += 1
+
+        cell = (car.row, car.col)
+        if self.last_cell is not None:
+            self.total_distance += abs(cell[0] - self.last_cell[0]) + abs(cell[1] - self.last_cell[1])
+
+        self.last_cell = cell
+
+    def finish(self):
+        if self.finished:
+            return
+
+        self.finished = True
+        self.end_time = time.time()
+        total_time = self.end_time - self.start_time
+
+        print("\n==============================")
+        print("🚗 SİMÜLASYON RAPORU")
+        print("==============================")
+        print(f"Algoritma        : {self.algorithm_name}")
+        print(f"Toplam Süre      : {total_time:.2f} saniye")
+        print(f"Toplam Kare      : {self.frame_count}")
+        print(f"Yol Uzunluğu     : {self.total_distance} birim")
+        print("==============================\n")
 
 
 # ------------------------------------------------------
@@ -147,6 +184,8 @@ class Game:
         self.selected_algorithm = None
         self.car = None
         self.pathfinder = PathFinder(GAME_MAP)  # Yol bulma motorunu başlat
+        self.metrics = None
+
 
         # Trafik ışıklarını tara
         self.traffic_lights = []
@@ -282,6 +321,8 @@ class Game:
 
         if path:
             self.car.set_path(path)
+            self.metrics = SimulationMetrics(self.selected_algorithm)
+
         else:
             print("Yol bulunamadı!")
 
@@ -423,6 +464,9 @@ class Game:
 
         # Araba güncelleme
         if self.car:
+            if self.metrics:
+                self.metrics.update(self.car)
+
             self.maybe_spawn_obstacle_after_delay()
 
             must_replan = self.car.update(
@@ -433,6 +477,9 @@ class Game:
                 self.recalculate_path_after_obstacle()
 
             self.car.draw(self.screen)
+            if self.metrics and self.car.path and self.car.path_index >= len(self.car.path):
+                self.metrics.finish()
+
 
         # Dinamik engelleri çiz
         for (r, c) in self.dynamic_obstacles:

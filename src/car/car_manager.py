@@ -180,3 +180,4 @@ class Car:
             )
         )
         screen.blit(self.image, rect)  # bu fonksiyon ekrana çizmeyi yapar
+ 

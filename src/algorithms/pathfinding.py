@@ -6,6 +6,7 @@ from map.map_data import GAME_MAP
 class PathFinder:
 
     def __init__(self, game_map):
+
         self.map = game_map
         self.rows = len(game_map)
         self.cols = len(game_map[0])
