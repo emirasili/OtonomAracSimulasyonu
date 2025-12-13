@@ -44,15 +44,40 @@ class Game:
 
     def __init__(self):
         pygame.init()
+        
+        # --- MÜZİK AYARLARI ---
+        try:
+            pygame.mixer.init()
+            music_path = os.path.join("assets", "menuMusic.mp3")  # dosya adını kendine göre ayarla
+            if os.path.exists(music_path):
+                pygame.mixer.music.load(music_path)
+                pygame.mixer.music.set_volume(0.4)  # 0.0 - 1.0 arası
+                pygame.mixer.music.play(-1)         # -1 = sonsuz döngü
+            else:
+                print("Müzik dosyası bulunamadı:", music_path)
+        except Exception as e:
+            print("Müzik başlatılamadı:", e)
+
 
         # Harita boyutları
         self.rows = len(GAME_MAP)
         self.cols = len(GAME_MAP[0])
 
-        # Ekran ayarları
+       # Ekran ayarları
         self.width = self.cols * TILE_SIZE
         self.height = self.rows * TILE_SIZE
         self.screen = pygame.display.set_mode((self.width, self.height))
+
+        # --- PENCERE AYARLARI ---
+        pygame.display.set_caption("SAÜTONOM - Akıllı Araç Simülasyonu")
+        self.clock = pygame.time.Clock()  # FPS kontrolü için saat nesnesi
+        
+         # --- MENÜ ARKA PLANI ---
+        self.menu_bg = None
+        bg_path = os.path.join("assets", "menuBackground.png")
+        if os.path.exists(bg_path):
+            bg_img = pygame.image.load(bg_path).convert()
+            self.menu_bg = pygame.transform.scale(bg_img, (self.width, self.height))
 
         # Dinamik engeller
         self.dynamic_obstacles = []
@@ -67,9 +92,6 @@ class Game:
              self.img_obstacle = pygame.Surface((TILE_SIZE, TILE_SIZE))
              self.img_obstacle.fill((200, 50, 50))
 
-
-        pygame.display.set_caption("SAÜTONOM - Akıllı Araç Simülasyonu")
-        self.clock = pygame.time.Clock()
 
         # Yol/duvar/resim yükleme
         self.images = {}
@@ -100,27 +122,31 @@ class Game:
             s.fill((50, 50, 50)) 
             self.images[7] = s
         
-        # Yazı tipleri
+        # --- MENÜ TASARIM ÖGELERİ ---
+        # Yazı Tipleri (Fontlar)
         self.title_font = pygame.font.SysFont("Verdana", 50, bold=True)
         self.subtitle_font = pygame.font.SysFont("Verdana", 20)
         self.ui_font = pygame.font.SysFont("Arial", 18, bold=True)
 
-        # Menü araba logosu
+        # Menüdeki Büyük Araba Logosu
         car_path = os.path.join("assets", "car.png")
         self.menu_car_img = None
         if os.path.exists(car_path):
             img = pygame.image.load(car_path)
+
+            # Pencere İkonunu Ayarla (Sol üstteki küçük ikon)
             icon_img = pygame.transform.scale(img, (32, 32))
             pygame.display.set_icon(icon_img)
+
+            # Menü logosunu büyüt ve hafif döndür
             img = pygame.transform.scale(img, (140, 140))
             self.menu_car_img = pygame.transform.rotate(img, 45)
 
-        # Oyun durumu
-        self.state = "MENU"
+        # --- OYUN DURUM DEĞİŞKENLERİ ---
+        self.state = "MENU"  # Başlangıç durumu (MENU veya GAME olabilir)
         self.selected_algorithm = None
         self.car = None
-        self.pathfinder = PathFinder(GAME_MAP)
-        self.current_path = []
+        self.pathfinder = PathFinder(GAME_MAP)  # Yol bulma motorunu başlat
 
         # Trafik ışıklarını tara
         self.traffic_lights = []
@@ -129,20 +155,56 @@ class Game:
                 if v == 6:
                     self.traffic_lights.append(TrafficLight(r, c))
 
-        # Butonlar
-        cx = self.width // 2 - 100
-        cy = self.height // 2 + 70
+       # --- BUTON GÖRSELLERİNİN YÜKLENMESİ ---
+        def load_button_images(base_filename, hover_filename):
+            base_img = hover_img = None
+            base_path = os.path.join("assets", base_filename)
+            hover_path = os.path.join("assets", hover_filename)
 
-        self.btn_bfs = Button(cx, cy, 200, 50, "BFS",
-                              (0, 100, 200), (0, 150, 255))
-        self.btn_dfs = Button(cx, cy + 60, 200, 50, "DFS",
-                              (0, 150, 100), (0, 200, 150))
-        self.btn_astar = Button(cx, cy + 120, 200, 50,
-                                "A*", (200, 50, 50), (255, 80, 80))
+            if os.path.exists(base_path):
+                base_img = pygame.image.load(base_path).convert_alpha()
+            if os.path.exists(hover_path):
+                hover_img = pygame.image.load(hover_path).convert_alpha()
+            return base_img, hover_img
 
+        bfs_img, bfs_hover = load_button_images("arayuzButton1.png", "arayuzButton1hover.png")
+        dfs_img, dfs_hover = load_button_images("arayuzButton2.png", "arayuzButton2hover.png")
+        astar_img, astar_hover = load_button_images("arayuzButton3.png", "arayuzButton3hover.png")
+
+        # Referans görsele göre konumlar (1280x720 tasarım)
+        # Tasarımda butonların kapladığı dikdörtgenler:
+        # x = 910, w ≈ 240
+        # y = 376 / 466 / 555, h ≈ 70
+        OFFSET_X = -60  # sola kaydırma miktarı
+        bfs_x, bfs_y   = 910 + OFFSET_X, 376
+        dfs_x, dfs_y   = 910 + OFFSET_X, 466
+        astar_x, astar_y = 910 + OFFSET_X, 555
+        btn_w, btn_h = 240, 70
+
+        # Algoritma Seçim Butonları (görsel tabanlı)py
+        # Button sınıfı image verilirse kendi rect'ini image boyutuna göre
+        # ayarlıyor ama topleft bu x,y değerlerinde kalıyor.
+        self.btn_bfs = Button(
+            bfs_x, bfs_y, btn_w, btn_h,
+            "", (0, 0, 0), (0, 0, 0),
+            image=bfs_img, hover_image=bfs_hover
+        )
+        self.btn_dfs = Button(
+            dfs_x, dfs_y, btn_w, btn_h,
+            "", (0, 0, 0), (0, 0, 0),
+            image=dfs_img, hover_image=dfs_hover
+        )
+        self.btn_astar = Button(
+            astar_x, astar_y, btn_w, btn_h,
+            "", (0, 0, 0), (0, 0, 0),
+            image=astar_img, hover_image=astar_hover
+        )
+
+        # Oyun içi "GERİ DÖN" Butonu (Sağ Alt Köşe) - eski stil dikdörtgen
         self.btn_back = Button(
-            self.width - 120, self.height - 60,
-            100, 40, "GERİ", (200, 50, 50), (255, 80, 80)
+            self.width - 110, self.height - 50,
+            100, 40, "GERİ",
+            (200, 50, 50), (255, 80, 80)
         )
 
         # Dinamik engel zamanlama
@@ -157,6 +219,30 @@ class Game:
                 if v == value:
                     return (r, c)
         return None
+    
+    def find_water_center_px(self):
+        """Haritadaki su hücrelerinin (2) ağırlık merkezini piksel olarak döndürür."""
+        cells = []
+        for r, row in enumerate(GAME_MAP):
+            for c, v in enumerate(row):
+                if v == 2:
+                    cells.append((r, c))
+
+        if not cells:
+            # su yoksa ekran ortası
+            return (self.width // 2, 40)
+
+        avg_r = sum(r for r, _ in cells) / len(cells)
+        avg_c = sum(c for _, c in cells) / len(cells)
+
+        x = int(avg_c * TILE_SIZE + TILE_SIZE // 2)
+        y = int(avg_r * TILE_SIZE + TILE_SIZE // 2)
+
+        # üstte kalsın diye biraz yukarı çekelim
+        y = max(30, y - 120)
+
+        return (x, y)
+
 
     # ------------------------------------------------------
     # SİMÜLASYONU BAŞLAT
@@ -314,26 +400,16 @@ class Game:
     # MENÜ ÇİZİMİ
     # ------------------------------------------------------
     def draw_menu(self, mouse_pos):
-        self.screen.fill((25, 30, 40))
-
-        title = self.title_font.render("SAÜTONOM", True, (255, 215, 0))
-        self.screen.blit(title, title.get_rect(center=(self.width // 2, 70)))
-
-        sub = self.subtitle_font.render(
-            "Otonom Araç Simülasyonu", True, (200, 200, 200)
-        )
-        self.screen.blit(sub, sub.get_rect(center=(self.width // 2, 115)))
-
-        if self.menu_car_img:
-            self.screen.blit(
-                self.menu_car_img,
-                self.menu_car_img.get_rect(center=(self.width // 2, 230))
-            )
+        """Menü ekranını çizer (Arkaplan, Başlık, Butonlar)"""
+        # Yeni arka plan
+        if self.menu_bg:
+            self.screen.blit(self.menu_bg, (0, 0))
+        else:
+            self.screen.fill((25, 30, 40))  # Yedek Koyu Gri/Lacivert
 
         self.btn_bfs.check_hover(mouse_pos)
         self.btn_dfs.check_hover(mouse_pos)
         self.btn_astar.check_hover(mouse_pos)
-
         self.btn_bfs.draw(self.screen)
         self.btn_dfs.draw(self.screen)
         self.btn_astar.draw(self.screen)
@@ -366,17 +442,47 @@ class Game:
 
         self.draw_path()
 
-        # UI Overlay
-        info_surf = pygame.Surface((220, 45))
-        info_surf.set_alpha(220) 
+        # -------------------------------
+        # ALFORİTMA PANELİ (Üst Orta)
+        # -------------------------------
+        panel_w, panel_h = 240, 45
+        info_surf = pygame.Surface((panel_w, panel_h))
+        info_surf.set_alpha(200)
         info_surf.fill((20, 20, 20))
-        self.screen.blit(info_surf, (10, 10))
-        pygame.draw.rect(self.screen, WHITE, (10, 10, 220, 45), 2)
-        
+
+        cx, cy = self.find_water_center_px()
+        panel_x = (self.width - panel_w) // 2 - 70
+        panel_y = 15  # üstten boşluk
+
+        self.screen.blit(info_surf, (panel_x, panel_y))
+        pygame.draw.rect(self.screen, WHITE, (panel_x, panel_y, panel_w, panel_h), 2)
+
         text = self.ui_font.render(f"Algoritma: {self.selected_algorithm}", True, ORANGE)
-        self.screen.blit(text, (25, 22))
+        text_rect = text.get_rect(center=(panel_x + panel_w // 2, panel_y + panel_h // 2))
+        self.screen.blit(text, text_rect)
+        
+        # -------------------------------
+        # HIZ PANELİ (Alt Orta)
+        # -------------------------------
+        speed_w, speed_h = 240, 45
+        speed_surf = pygame.Surface((speed_w, speed_h))
+        speed_surf.set_alpha(220)
+        speed_surf.fill((20, 20, 20))
 
+        speed_x = (self.width - panel_w) // 2 - 70
+        speed_y = self.height - speed_h - 5   # alt boşluk (istersen 25 yap)
 
+        self.screen.blit(speed_surf, (speed_x, speed_y))
+        pygame.draw.rect(self.screen, WHITE, (speed_x, speed_y, speed_w, speed_h), 2)
+
+        # aktif hız (car yoksa 0 göster)
+        active_speed = self.car.current_speed if (self.car and hasattr(self.car, "current_speed")) else 0
+        speed_text = self.ui_font.render(f"Hız: {active_speed:.1f}", True, ORANGE)
+        # ortala
+        speed_rect = speed_text.get_rect(center=(speed_x + speed_w // 2, speed_y + speed_h // 2))
+        self.screen.blit(speed_text, speed_rect)
+        
+    # "Geri Dön" Butonunu Çiz
         self.btn_back.check_hover(mouse_pos)
         self.btn_back.draw(self.screen)
 

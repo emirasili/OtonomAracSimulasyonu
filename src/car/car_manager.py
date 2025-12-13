@@ -32,7 +32,16 @@ class Car:
         # Yol takip değişkenleri
         self.path = []
         self.path_index = 0
-        self.speed = 4  # Piksel/frame
+        self.base_speed = 4
+        self.transition_speed = 2.5
+        self.crosswalk_speed = 1
+        self.crosswalk_cooldown_max = 30  # ~0.5 sn
+        self.crosswalk_cooldown = 0
+        self.speed = self.base_speed
+        self.is_waiting_red = False
+        
+
+
 
     # ---------------------------------------------------------
     # 🔍 DİNAMİK ENGEL ALGILAMA
@@ -58,7 +67,8 @@ class Car:
             self.row, self.col = path[0]
             self.pixel_x = self.col * TILE_SIZE
             self.pixel_y = self.row * TILE_SIZE
-
+    # ---------------------------------------------------------
+    
     # ---------------------------------------------------------
     def update(self, game_map=None, traffic_lights=None, dynamic_obstacles=None):
         """
@@ -81,9 +91,13 @@ class Car:
         current_col = int(self.pixel_x // TILE_SIZE)
 
         # Bulunduğum karede kırmızı ışık varsa, bu frame'de hiç hareket etmiyorum.
+        self.is_waiting_red = False  # her frame başında reset
+
         for tl in traffic_lights:
             if tl.row == current_row and tl.col == current_col and tl.state == "RED":
-                return False  # Hareket yok, yeniden planlama da yok
+                self.is_waiting_red = True
+                self.current_speed = 0.0
+                return False
 
         # Takip edilecek bir yol yoksa ya da sona geldiysem hareket etmiyorum.
         if not self.path or self.path_index >= len(self.path):
@@ -101,6 +115,28 @@ class Car:
         # Hedef karenin piksel koordinatları
         target_x = target_col * TILE_SIZE
         target_y = target_row * TILE_SIZE
+        
+        # --- HIZ KONTROLÜ (HAREKETTEN ÖNCE) ---
+        if game_map is not None:
+            current_tile = game_map[current_row][current_col]
+            target_tile  = game_map[target_row][target_col]
+
+            self.speed = self.base_speed
+
+            if target_tile in [5, 6]:
+                self.speed = self.transition_speed
+
+            on_crosswalk = (current_tile == 7) or (target_tile == 7)
+            if on_crosswalk:
+                self.crosswalk_cooldown = self.crosswalk_cooldown_max
+                self.speed = self.crosswalk_speed
+            else:
+                if self.crosswalk_cooldown > 0:
+                    self.crosswalk_cooldown -= 1
+                    self.speed = self.crosswalk_speed
+
+        # panel için anlık hız (kırmızıda zaten 0 dönmüştük)
+        self.current_speed = float(self.speed)
 
         # Hedefe olan mesafe ve yönü hesaplıyorum.
         dx = target_x - self.pixel_x
@@ -131,7 +167,8 @@ class Car:
             self.image = pygame.transform.rotate(
                 self.original_image, self.angle)
 
-        return False  # Engel yoktu, normal ilerledim; yeniden planlama gerekmiyor
+        return False
+
 
     # ---------------------------------------------------------
     def draw(self, screen):

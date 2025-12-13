@@ -11,10 +11,10 @@ class PathFinder:
         self.cols = len(game_map[0])
 
     # --------------------------------------------------------
-    # Kare yürünebilir mi?
+    # Yürünebilir kare kontrolü
     # --------------------------------------------------------
     def is_walkable(self, r, c):
-        return GAME_MAP[r][c] in [0, 3, 4, 5, 6]
+        return GAME_MAP[r][c] in [0, 3, 4, 5, 6, 7]
 
     # --------------------------------------------------------
     # Komşu kareleri bul
