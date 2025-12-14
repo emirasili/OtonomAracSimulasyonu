@@ -7,14 +7,14 @@ Bu proje, bir aracın şehir içi ortamda engellerden kaçınarak, trafik ışı
 
 👥 Ekip & Görev Dağılımı
 
-| 📁 Klasör           | 📝 Görev         | 👥 Sorumlular      |
-| ------------------- | ---------------- | ------------------- |
-| **src/** (main)     | Entegrasyon      | Emir                |
-| **src/map/**        | Harita           | Yakup – Defne       |
-| **src/car/**        | Araç & Sensör    | Raziye – Sude       |
-| **src/algorithms/** | Algoritmalar     | Emir – Asude – Umut |
-| **src/simulation/** | Simülasyon Akışı | Asude – Defne       |
-| **docs/**           | Rapor & Sunum    | Nihal – Zeynep      |
-| **tests/**          | Test             | Sena                |
-| **assets/**         | Ortak Varlıklar  | Yakup               |
+| 📁 Klasör           | 📝 Görev         | 👥 Sorumlular        |
+| ------------------- | ---------------- | --------------------- |
+| **src/** (main)     | Entegrasyon      | Emir                  |
+| **src/map/**        | Harita           | Yakup – Defne - Asude |
+| **src/car/**        | Araç & Sensör    | Raziye – Sude         |
+| **src/algorithms/** | Algoritmalar     | Emir – Umut           |
+| **src/simulation/** | Simülasyon Akışı | Asude – Defne         |
+| **docs/**           | Rapor & Sunum    | Nihal – Zeynep        |
+| **tests/**          | Test             | Sena                  |
+| **assets/**         | Ortak Varlıklar  | Yakup                 |
 

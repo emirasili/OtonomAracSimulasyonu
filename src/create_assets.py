@@ -45,18 +45,18 @@ def draw_arm(surface, direction):
         pygame.draw.line(surface, LINE_COLOR, (mid, mid), (mid + 8, mid), LINE_WIDTH)
         pygame.draw.line(surface, LINE_COLOR, (mid + 14, mid), (TILE_SIZE, mid), LINE_WIDTH)
 
-# --- YOL PARÇALARI ---
-s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); save_surface(s, "road_v.png")
-s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); save_surface(s, "road_h.png")
-s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "RIGHT"); save_surface(s, "road_ur.png")
-s = create_base_surface(); draw_arm(s, "RIGHT"); draw_arm(s, "DOWN"); save_surface(s, "road_rd.png")
-s = create_base_surface(); draw_arm(s, "DOWN"); draw_arm(s, "LEFT"); save_surface(s, "road_dl.png")
-s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "UP"); save_surface(s, "road_lu.png")
-s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); draw_arm(s, "DOWN"); save_surface(s, "road_t_down.png")
-s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); draw_arm(s, "UP"); save_surface(s, "road_t_up.png")
-s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); draw_arm(s, "LEFT"); save_surface(s, "road_t_left.png")
-s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); draw_arm(s, "RIGHT"); save_surface(s, "road_t_right.png")
-s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); save_surface(s, "road_cross.png")
+# # --- YOL PARÇALARI ---
+# s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); save_surface(s, "road_v.png")
+# s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); save_surface(s, "road_h.png")
+# s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "RIGHT"); save_surface(s, "road_ur.png")
+# s = create_base_surface(); draw_arm(s, "RIGHT"); draw_arm(s, "DOWN"); save_surface(s, "road_rd.png")
+# s = create_base_surface(); draw_arm(s, "DOWN"); draw_arm(s, "LEFT"); save_surface(s, "road_dl.png")
+# s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "UP"); save_surface(s, "road_lu.png")
+# s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); draw_arm(s, "DOWN"); save_surface(s, "road_t_down.png")
+# s = create_base_surface(); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); draw_arm(s, "UP"); save_surface(s, "road_t_up.png")
+# s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); draw_arm(s, "LEFT"); save_surface(s, "road_t_left.png")
+# s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); draw_arm(s, "RIGHT"); save_surface(s, "road_t_right.png")
+# s = create_base_surface(); draw_arm(s, "UP"); draw_arm(s, "DOWN"); draw_arm(s, "LEFT"); draw_arm(s, "RIGHT"); save_surface(s, "road_cross.png")
 
 # --- BİNA (DAHA DETAYLI) ---
 s = pygame.Surface((TILE_SIZE, TILE_SIZE))
@@ -107,8 +107,7 @@ save_surface(s, "traffic_light.png")
 # --- DİNAMİK ENGEL: ÇUKUR (Pothole) ---
 s = pygame.Surface((TILE_SIZE, TILE_SIZE))
 s.fill(ROAD_COLOR) # Yol rengi zemin
-# Çukurun dışı (Açık gri)
-pygame.draw.ellipse(s, (70, 70, 70), (5, 10, 30, 20))
+
 # Çukurun içi (Siyah/Koyu)
 pygame.draw.ellipse(s, (20, 20, 20), (8, 12, 24, 16))
 # Uyarı Dubası (Turuncu Konik - Üstten görünüm)
