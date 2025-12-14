@@ -116,25 +116,7 @@ pygame.draw.circle(s, (255, 140, 0), (30, 30), 6)
 pygame.draw.circle(s, (255, 255, 255), (30, 30), 3)
 save_surface(s, "obstacle.png")
 
-# --- ARABA (DETAYLI) ---
-s = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
-# Gölge
-pygame.draw.rect(s, (30, 30, 30), (12, 6, 20, 32), border_radius=5) 
-# Gövde
-pygame.draw.rect(s, CAR_COLOR, (10, 4, 20, 32), border_radius=5) 
-# Ön Cam
-pygame.draw.rect(s, (50, 50, 70), (11, 10, 18, 5))
-# Arka Cam
-pygame.draw.rect(s, (50, 50, 70), (11, 28, 18, 4))
-# Tavan
-pygame.draw.rect(s, (200, 0, 0), (11, 16, 18, 11))
-# Farlar (Sarı)
-pygame.draw.rect(s, (255, 255, 200), (10, 2, 5, 3))
-pygame.draw.rect(s, (255, 255, 200), (25, 2, 5, 3))
-save_surface(s, "car.png")
-
 # Start/Hedef
-s = pygame.Surface((TILE_SIZE, TILE_SIZE)); s.fill((255, 215, 0)); font = pygame.font.SysFont("Arial", 24, bold=True); s.blit(font.render("S", True, (0,0,0)), (12, 8)); save_surface(s, "start.png")
 s = pygame.Surface((TILE_SIZE, TILE_SIZE)); s.fill((220, 20, 60)); pygame.draw.circle(s, (255,255,255), (TILE_SIZE//2, TILE_SIZE//2), 10); save_surface(s, "target.png")
 
 pygame.quit()

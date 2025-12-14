@@ -101,6 +101,8 @@ class Car:
 
         # Takip edilecek bir yol yoksa ya da sona geldiysem hareket etmiyorum.
         if not self.path or self.path_index >= len(self.path):
+            self.is_waiting_red = False
+            self.current_speed = 0.0
             return False
 
         # --- Dinamik engel kontrolü ---

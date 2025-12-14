@@ -158,6 +158,23 @@ class Game:
             s = pygame.Surface((TILE_SIZE, TILE_SIZE))
             s.fill((50, 50, 50)) 
             self.images[7] = s
+            
+        # --- KONUMA ÖZEL MAP TILE'LARI (map_01.png, map_02.png, ...) ---
+        # Hem wall (1) hem de water (2) hücreleri için.
+        self.map_tiles = {}
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if GAME_MAP[r][c] not in (1, 2):
+                    continue
+                index = r * self.cols + c + 1  # 1'den başlat
+                # map_01, map_02, ..., map_10, map_100 ...
+                filename = f"map_{index:02}.png"
+                path = os.path.join("assets", filename)
+                if os.path.exists(path):
+                    img = pygame.image.load(path)
+                    self.map_tiles[(r, c)] = pygame.transform.scale(
+                        img, (TILE_SIZE, TILE_SIZE)
+                    )
         
         # --- MENÜ TASARIM ÖGELERİ ---
         # Yazı Tipleri (Fontlar)
@@ -563,18 +580,28 @@ class Game:
                         7: "t_right", 13: "t_left", 15: "cross"
                     }
 
-                    # Yaya Geçidi (7) için zemin yolunu seç, diğerleri için normal maske
                     img_key = mapping.get(mask, "h")
                     if cell == 7:
-                        img = self.images.get(7) # Yaya geçidi zemini
+                        img = self.images.get(7)  # Yaya geçidi zemini
                     else:
                         img = self.images.get(img_key)
                 else:
-                    img = self.images.get(cell)
+                    # Yol değilse normal resmini al (Duvar, Su vb.)
+                    if cell in (1, 2):
+                        # Bu griddeki konuma göre özel map tile varsa onu kullan
+                        img = self.map_tiles.get((r, c))
+                        if img is None:
+                            # Fallback: eski wall/water tile
+                            if cell == 1:
+                                img = self.images.get(1)
+                            else:  # cell == 2
+                                img = self.images.get(2)
+                    else:
+                        img = self.images.get(cell)
 
                 if img:
                     self.screen.blit(img, (c * TILE_SIZE, r * TILE_SIZE))
-        
+
         # Yaya geçitlerinin çizgilerini en üstte çiz (Yolun üzerine)
         self.draw_crosswalk_lines()
 

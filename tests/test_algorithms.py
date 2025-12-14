@@ -26,5 +26,7 @@
 #==============================         ==============================           ==============================
 
 
-#Yol sonunda araç durduğu halde hız göstergesi 4 olrak kalıyor.
-#Algoritma A* ile BFS aynı engeller ve aynı yolu kullanıyor. Engeller çıktığında da aynı rotayı tercih ediyor.
+#Yol sonunda araç durduğu halde hız göstergesi 4 olrak kalıyor.  ---> fixed
+#Algoritma A* ile BFS aynı engeller ve aynı yolu kullanıyor. Engeller çıktığında da aynı rotayı tercih ediyor. ---> Beklenen davranış bu mu? 
+# ---> Evet, çünkü her iki algoritma da en kısa yolu bulmaya çalışıyor. A* (Manhattan heuristic) optimal bir algoritmadır; engeller ve maliyetler eşitse, BFS ile aynı optimal yolu bulması normaldir.
+
