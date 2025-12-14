@@ -256,12 +256,26 @@ class Game:
             image=astar_img, hover_image=astar_hover
         )
 
-        # Oyun içi "GERİ DÖN" Butonu (Sağ Alt Köşe) - eski stil dikdörtgen
-        self.btn_back = Button(
-            self.width - 110, self.height - 50,
-            100, 40, "GERİ",
-            (200, 50, 50), (255, 80, 80)
-        )
+        # Oyun içi "GERİ DÖN" Butonu (Sağ Alt Köşe) - geri.png / gerihover.png
+        back_img, back_hover = load_button_images("geri.png", "gerihover.png")
+        if back_img is not None:
+            if back_hover is None:
+                back_hover = back_img  # hover yoksa aynı resmi kullan
+            back_w, back_h = back_img.get_width(), back_img.get_height()
+            back_x = self.width - back_w - 10
+            back_y = self.height - back_h - 10
+            self.btn_back = Button(
+                back_x, back_y, back_w, back_h,
+                "", (0, 0, 0), (0, 0, 0),
+                image=back_img, hover_image=back_hover
+            )
+        else:
+            # Yedek: eski dikdörtgen buton
+            self.btn_back = Button(
+                self.width - 110, self.height - 50,
+                100, 40, "GERİ",
+                (200, 50, 50), (255, 80, 80)
+            )
 
         # Dinamik engel zamanlama
         self.obstacle_placed = False        
@@ -506,9 +520,7 @@ class Game:
 
         self.draw_path()
 
-        # -------------------------------
-        # ALFORİTMA PANELİ (Üst Orta)
-        # -------------------------------
+       # --- ALGORİTMA PANELİ (Üst Orta) ---
         panel_w, panel_h = 240, 45
         info_surf = pygame.Surface((panel_w, panel_h))
         info_surf.set_alpha(200)
@@ -516,33 +528,29 @@ class Game:
 
         cx, cy = self.find_water_center_px()
         panel_x = (self.width - panel_w) // 2 - 70
-        panel_y = 15  # üstten boşluk
+        panel_y = 15
 
         self.screen.blit(info_surf, (panel_x, panel_y))
-        pygame.draw.rect(self.screen, WHITE, (panel_x, panel_y, panel_w, panel_h), 2)
+        pygame.draw.rect(self.screen, (0, 147, 51), (panel_x, panel_y, panel_w, panel_h), 2)
 
-        text = self.ui_font.render(f"Algoritma: {self.selected_algorithm}", True, ORANGE)
+        text = self.ui_font.render(f"Algoritma: {self.selected_algorithm}", True, (255, 96, 227))
         text_rect = text.get_rect(center=(panel_x + panel_w // 2, panel_y + panel_h // 2))
         self.screen.blit(text, text_rect)
-        
-        # -------------------------------
-        # HIZ PANELİ (Alt Orta)
-        # -------------------------------
+
+        # --- HIZ PANELİ (Alt Orta) ---
         speed_w, speed_h = 240, 45
         speed_surf = pygame.Surface((speed_w, speed_h))
         speed_surf.set_alpha(220)
         speed_surf.fill((20, 20, 20))
 
         speed_x = (self.width - panel_w) // 2 - 70
-        speed_y = self.height - speed_h - 5   # alt boşluk (istersen 25 yap)
+        speed_y = self.height - speed_h - 5
 
         self.screen.blit(speed_surf, (speed_x, speed_y))
-        pygame.draw.rect(self.screen, WHITE, (speed_x, speed_y, speed_w, speed_h), 2)
+        pygame.draw.rect(self.screen, (0, 147, 51), (speed_x, speed_y, speed_w, speed_h), 2)
 
-        # aktif hız (car yoksa 0 göster)
         active_speed = self.car.current_speed if (self.car and hasattr(self.car, "current_speed")) else 0
-        speed_text = self.ui_font.render(f"Hız: {active_speed:.1f}", True, ORANGE)
-        # ortala
+        speed_text = self.ui_font.render(f"Hız: {active_speed:.1f}", True,  (255, 96, 227))
         speed_rect = speed_text.get_rect(center=(speed_x + speed_w // 2, speed_y + speed_h // 2))
         self.screen.blit(speed_text, speed_rect)
         
